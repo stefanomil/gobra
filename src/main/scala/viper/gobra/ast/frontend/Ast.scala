@@ -880,6 +880,26 @@ case class PImplementationProofPredicateAlias(left: PIdnUse, right: PNameOrDot) 
 
 sealed trait PNameOrDot extends PExpression
 
+case class PClosureSpec(
+                         interface: PClosureInterface,
+                         pres: Vector[PExpression],
+                         preserves: Vector[PExpression],
+                         posts: Vector[PExpression],
+                         terminationMeasures: Vector[PTerminationMeasure],
+                         params: Vector[PParameter],
+                         args: Vector[PParameter],
+                         result: PResult
+                       ) extends PGhostMember with PScope with PCodeRootWithResult
+
+case class PClosureInterface(
+                              vars: Vector[PParameter],
+                              funcs: Vector[PClosureInterfaceFuncSig]
+                            )
+
+case class PClosureInterfaceFuncSig(
+                                      args: Vector[PParameter],
+                                      result: PResult
+                                    )
 /**
   * Ghost Statement
   */
