@@ -441,6 +441,37 @@ class ParseTreeTranslator(pom: PositionManager, source: Source, specOnly : Boole
     * <p>The default implementation returns the result of calling
     * {@link #visitChildren} on {@code ctx}.</p>
     */
+  override def visitClosureSpecDecl(ctx: GobraParser.ClosureSpecDeclContext): Vector[PClosureSpecDecl] = {
+    // The name of each spec must be unique and not blank.
+    val id = idnDef.get(ctx.IDENTIFIER())
+    val spec = if (ctx.specification() != null) visitSpecification(ctx.specification()) else PFunctionSpec(Vector.empty,Vector.empty,Vector.empty, Vector.empty).at(ctx)
+    if (spec.isTrusted) fail(ctx.specification().TRUSTED(0), "a closure specification does not allow the 'trusted' keyword")
+    if (spec.terminationMeasures.nonEmpty) fail(ctx.specification().specStatement().asScala.view.filter(_.DEC() != null).head, "termination measures are not supported for closure specifications")
+
+    val params = visitNodeOrElse[Vector[Vector[PParameter]]](ctx.closureParams(), Vector.empty)
+    val (args, result) = visitSignature(ctx.signature())
+    Vector(PClosureSpecDecl(id, PClosureInterface(Vector.empty, Vector.empty), spec, params.flatten, args, result))
+  }
+
+  /**
+    * {@inheritDoc  }
+    *
+    * <p>The default implementation returns the result of calling
+    * {@link #visitChildren} on {@code ctx}.</p>
+    */
+  override def visitClosureInterface(ctx: GobraParser.ClosureInterfaceContext): PClosureInterface = {
+    val groups = ctx.closureInterfaceFuncSignature().asScala.view.groupBy(_.getRuleIndex)
+    print(groups)
+
+    PClosureInterface(Vector.empty, Vector.empty)
+  }
+
+  /**
+    * {@inheritDoc  }
+    *
+    * <p>The default implementation returns the result of calling
+    * {@link #visitChildren} on {@code ctx}.</p>
+    */
   override def visitPredicateSpec(ctx: PredicateSpecContext): PMPredicateSig = {
     val id = idnDef.get(ctx.IDENTIFIER())
     val args = visitNode[Vector[Vector[PParameter]]](ctx.parameters())
@@ -2139,10 +2170,10 @@ class ParseTreeTranslator(pom: PositionManager, source: Source, specOnly : Boole
   /** Helper Function for optional Nodes
     *
     * @param ctx a context that might be null (signified with ? in the grammar)
-    * @tparam P The PNode type
+    * @tparam P
     * @return a positioned Option of a positioned PNode
     */
-  def visitNodeOrNone[P <: PNode](ctx : ParserRuleContext) : Option[P] = {
+  def visitNodeOrNone[P <: AnyRef](ctx : ParserRuleContext) : Option[P] = {
     if (ctx != null) {
       Some(visitNode(ctx)).pos()
     } else None
@@ -2151,10 +2182,10 @@ class ParseTreeTranslator(pom: PositionManager, source: Source, specOnly : Boole
   /** Helper Function for Nodes with a default
     *
     * @param ctx a context that might be null (signified with ? in the grammar)
-    * @tparam P The PNode type
+    * @tparam P
     * @return a positioned Option of a positioned PNode
     */
-  def visitNodeOrElse[P <: PNode](ctx : ParserRuleContext, default : P) : P = {
+  def visitNodeOrElse[P <: AnyRef](ctx : ParserRuleContext, default : P) : P = {
     visitNodeOrNone[P](ctx) match {
       case Some(value) => value
       case None => default

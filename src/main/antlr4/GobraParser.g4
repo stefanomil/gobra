@@ -36,12 +36,13 @@ maybeAddressableIdentifier: IDENTIFIER ADDR_MOD?;
 
 sourceFile:
   packageClause eos (importDecl eos)* (
-    (specMember | declaration | ghostMember | closureSpec) eos
+    (specMember | declaration | ghostMember) eos
   )* EOF;
 
 ghostMember: implementationProof
   | fpredicateDecl
   | mpredicateDecl
+  | closureSpecDecl
   | explicitGhostMember;
 
 // Ghost statements
@@ -332,16 +333,15 @@ methodSpec:
   GHOST? specification IDENTIFIER parameters result
   | GHOST? specification IDENTIFIER parameters;
 
-// Added closure specification
-closureSpec:
-  (closureInterface eos)? (specStatement eos)*? SPEC closureParams IDENTIFIER signature;
+// Added closure spec declaration
+closureSpecDecl:
+  (closureInterface eos)? specification SPEC closureParams? IDENTIFIER signature;
 
 closureInterface:
-  INTERFACE L_CURLY ((closureInterfaceFuncSignature) eos)* R_CURLY;
+  INTERFACE L_CURLY (closureInterfaceFuncSignature (COMMA closureInterfaceFuncSignature)* COMMA?)? R_CURLY;
 
 closureInterfaceFuncSignature:
-  IDENTIFIER parameters result
-  | IDENTIFIER type_;
+  IDENTIFIER ((parameters result) | type_);
 
 closureParams:
   LESS (parameterDecl (COMMA parameterDecl)* COMMA?)? GREATER;
