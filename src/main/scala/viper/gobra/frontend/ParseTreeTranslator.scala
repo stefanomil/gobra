@@ -444,13 +444,14 @@ class ParseTreeTranslator(pom: PositionManager, source: Source, specOnly : Boole
   override def visitClosureSpecDecl(ctx: GobraParser.ClosureSpecDeclContext): Vector[PClosureSpecDecl] = {
     // The name of each spec must be unique and not blank.
     val id = idnDef.get(ctx.IDENTIFIER())
+    val interface = if (ctx.closureInterfaceDecl() != null) visitClosureInterfaceDecl(ctx.closureInterfaceDecl()) else PClosureInterfaceDecl(Vector.empty, Vector.empty)
     val spec = if (ctx.specification() != null) visitSpecification(ctx.specification()) else PFunctionSpec(Vector.empty,Vector.empty,Vector.empty, Vector.empty).at(ctx)
     if (spec.isTrusted) fail(ctx.specification().TRUSTED(0), "a closure specification does not allow the 'trusted' keyword")
     if (spec.terminationMeasures.nonEmpty) fail(ctx.specification().specStatement().asScala.view.filter(_.DEC() != null).head, "termination measures are not supported for closure specifications")
 
     val params = visitNodeOrElse[Vector[Vector[PParameter]]](ctx.closureParams(), Vector.empty)
     val (args, result) = visitSignature(ctx.signature())
-    Vector(PClosureSpecDecl(id, PClosureInterface(Vector.empty, Vector.empty), spec, params.flatten, args, result))
+    Vector(PClosureSpecDecl(id, interface, spec, params.flatten, args, result))
   }
 
   /**
@@ -459,11 +460,12 @@ class ParseTreeTranslator(pom: PositionManager, source: Source, specOnly : Boole
     * <p>The default implementation returns the result of calling
     * {@link #visitChildren} on {@code ctx}.</p>
     */
-  override def visitClosureInterface(ctx: GobraParser.ClosureInterfaceContext): PClosureInterface = {
-    val groups = ctx.closureInterfaceFuncSignature().asScala.view.groupBy(_.getRuleIndex)
-    print(groups)
+  override def visitClosureInterfaceDecl(ctx: GobraParser.ClosureInterfaceDeclContext): PClosureInterfaceDecl = {
+    val members = ctx.closureInterfaceMember().asScala.view
+    val stateVars = members.filter(_.type_() != null).map(m => PNamedParameter(idnDef.get(m.IDENTIFIER()), visitNode[PType](m.type_())))
+    val stateFuncs = members.filter(_.signature() != null).map(m => visitSignature(m.signature()))
 
-    PClosureInterface(Vector.empty, Vector.empty)
+    PClosureInterfaceDecl(stateVars.toVector, stateFuncs.toVector)
   }
 
   /**

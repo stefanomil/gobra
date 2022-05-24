@@ -882,15 +882,15 @@ sealed trait PNameOrDot extends PExpression
 
 case class PClosureSpecDecl(
                          id: PIdnDef,
-                         interface: PClosureInterface,
+                         interface: PClosureInterfaceDecl,
                          spec: PFunctionSpec,
                          params: Vector[PParameter],
                          args: Vector[PParameter],
                          result: PResult
                        ) extends PGhostMember with PScope with PCodeRootWithResult
 
-case class PClosureInterface(
-                              vars: Vector[PParameter],
+case class PClosureInterfaceDecl(
+                              vars: Vector[PNamedParameter],
                               funcs: Vector[(Vector[PParameter], PResult)]
                             )
 

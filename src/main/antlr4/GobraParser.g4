@@ -335,13 +335,13 @@ methodSpec:
 
 // Added closure spec declaration
 closureSpecDecl:
-  (closureInterface eos)? specification SPEC closureParams? IDENTIFIER signature;
+  (closureInterfaceDecl eos)? specification SPEC closureParams? IDENTIFIER signature;
 
-closureInterface:
-  INTERFACE L_CURLY (closureInterfaceFuncSignature (COMMA closureInterfaceFuncSignature)* COMMA?)? R_CURLY;
+closureInterfaceDecl:
+  INTERFACE L_CURLY (closureInterfaceMember eos)* R_CURLY;
 
-closureInterfaceFuncSignature:
-  IDENTIFIER ((parameters result) | type_);
+closureInterfaceMember:
+  IDENTIFIER (signature | type_);
 
 closureParams:
   LESS (parameterDecl (COMMA parameterDecl)* COMMA?)? GREATER;
