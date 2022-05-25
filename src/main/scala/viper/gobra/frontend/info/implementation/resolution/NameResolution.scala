@@ -78,6 +78,7 @@ trait NameResolution { this: TypeInfoImpl =>
 
         case decl: PFPredicateDecl => FPredicate(decl, this)
         case decl: PMPredicateDecl => MPredicateImpl(decl, this)
+        case decl: PClosureSpecDecl => ClosureSpec(decl, this)
         case tree.parent.pair(decl: PMPredicateSig, tdef: PInterfaceType) => MPredicateSpec(decl, tdef, this)
 
         case tree.parent.pair(decl: PDomainFunction, domain: PDomainType) => DomainFunction(decl, domain, this)
@@ -202,6 +203,7 @@ trait NameResolution { this: TypeInfoImpl =>
       case PExplicitGhostMember(a) => packageLevelDefinitions(a)
       case p: PMPredicateDecl => Vector(p.id)
       case p: PFPredicateDecl => Vector(p.id)
+      case p: PClosureSpecDecl => Vector(p.id)
       case _: PImplementationProof => Vector.empty
     }
   }

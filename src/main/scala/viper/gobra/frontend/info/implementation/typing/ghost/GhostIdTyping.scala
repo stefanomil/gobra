@@ -8,8 +8,8 @@ package viper.gobra.frontend.info.implementation.typing.ghost
 
 import org.bitbucket.inkytonik.kiama.util.Messaging.noMessages
 import viper.gobra.ast.frontend.PIdnNode
-import viper.gobra.frontend.info.base.SymbolTable.{BoundVariable, BuiltInFPredicate, BuiltInMPredicate, DomainFunction, GhostRegular, Predicate}
-import viper.gobra.frontend.info.base.Type.{AssertionT, FunctionT, Type}
+import viper.gobra.frontend.info.base.SymbolTable.{BoundVariable, BuiltInFPredicate, BuiltInMPredicate, ClosureSpec, DomainFunction, GhostRegular, Predicate}
+import viper.gobra.frontend.info.base.Type.{AssertionT, FunctionT, SpecT, Type}
 import viper.gobra.frontend.info.implementation.TypeInfoImpl
 import viper.gobra.util.Violation.violation
 
@@ -21,6 +21,10 @@ trait GhostIdTyping { this: TypeInfoImpl =>
     case _: BoundVariable => LocalMessages(noMessages)
     case predicate: Predicate => unsafeMessage(! {
       predicate.args.forall(wellDefMisc.valid)
+    })
+    case spec: ClosureSpec => unsafeMessage(! {
+      spec.interface.members.forall(wellDefMisc.valid) && spec.params.forall(wellDefMisc.valid) &&
+        spec.args.forall(wellDefMisc.valid) && wellDefMisc.valid(spec.result)
     })
     case f: DomainFunction => unsafeMessage(! {
       f.result.outs.size == 1 && f.args.forall(wellDefMisc.valid) && wellDefMisc.valid(f.result)

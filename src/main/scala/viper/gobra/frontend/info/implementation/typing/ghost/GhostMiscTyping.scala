@@ -25,6 +25,7 @@ trait GhostMiscTyping extends BaseTyping { this: TypeInfoImpl =>
     case PBoundVariable(_, _) => noMessages
     case PTrigger(exprs) => exprs.flatMap(isWeaklyPureExpr)
     case PExplicitGhostParameter(_) => noMessages
+    case PClosureInterface(m) => nonVariadicArguments(m, "Closure interfaces")
     case p: PPredConstructorBase => p match {
       case PFPredBase(id) => entity(id) match {
         case _: SymbolTable.FPredicate | _: SymbolTable.BuiltInFPredicate => noMessages

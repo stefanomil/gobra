@@ -88,10 +88,10 @@ class DefaultPrettyPrinter extends PrettyPrinter with kiama.output.PrettyPrinter
       case n: PVarDecl => showVarDecl(n)
       case n: PTypeDecl => showTypeDecl(n)
       case PFunctionDecl(id, args, res, spec, body) =>
-        showSpec(spec) <> "func" <+> showId(id) <> parens(showParameterList(args)) <> showResult(res) <>
+        showSpec(spec) <> "func" <+> showSignature(id, args, res) <>
           opt(body)(b => space <> showBodyParameterInfoWithBlock(b._1, b._2))
       case PMethodDecl(id, rec, args, res, spec, body) =>
-        showSpec(spec) <> "func" <+> showReceiver(rec) <+> showId(id) <> parens(showParameterList(args)) <> showResult(res) <>
+        showSpec(spec) <> "func" <+> showReceiver(rec) <+> showSignature(id, args, res) <>
         opt(body)(b => space <> showBodyParameterInfoWithBlock(b._1, b._2))
     }
     case member: PGhostMember => member match {
@@ -100,6 +100,10 @@ class DefaultPrettyPrinter extends PrettyPrinter with kiama.output.PrettyPrinter
         "pred" <+> showId(id) <> parens(showParameterList(args)) <> opt(body)(b => space <> block(showExpr(b)))
       case PMPredicateDecl(id, recv, args, body) =>
         "pred" <+> showReceiver(recv) <+> showId(id) <> parens(showParameterList(args)) <> opt(body)(b => space <> block(showExpr(b)))
+      case PClosureSpecDecl(id, interface, params, args, res, spec) =>
+          (if (interface.members.nonEmpty) showMisc(interface) else emptyDoc) <>
+          showSpec(spec) <> "spec" <+> (if (params.nonEmpty) angles(showParameterList(params)) else emptyDoc) <>
+          showId(id) <> parens(showParameterList(args)) <> showResult(res)
       case ip: PImplementationProof =>
         showType(ip.subT) <+> "implements" <+> showType(ip.superT) <> (
             if (ip.alias.isEmpty && ip.memberProofs.isEmpty) emptyDoc
@@ -122,6 +126,9 @@ class DefaultPrettyPrinter extends PrettyPrinter with kiama.output.PrettyPrinter
     }
     "decreases" <+> measureDoc(measure)
   }
+
+  def showSignature(id: PIdnDef, args: Vector[PParameter], res: PResult): Doc = showId(id) <> parens(showParameterList(args)) <> showResult(res)
+  def showSignature(sign: (PIdnDef, (Vector[PParameter], PResult))): Doc = showSignature(sign._1, sign._2._1, sign._2._2)
 
   def showSpec(spec: PSpecification): Doc = spec match {
     case PFunctionSpec(pres, preserves, posts, measures, isPure, isTrusted) =>
@@ -156,7 +163,7 @@ class DefaultPrettyPrinter extends PrettyPrinter with kiama.output.PrettyPrinter
   def showTypeList[T <: PType](list: Vector[T]): Doc = showList(list)(showType)
   def showIdList[T <: PIdnNode](list: Vector[T]): Doc = showList(list)(showId)
 
-  def showList[T](list: Vector[T])(f: T => Doc): Doc = ssep(list map f, comma <> space)
+  def showList[T](list: Vector[T], separator: Doc = comma)(f: T => Doc): Doc = ssep(list map f, separator <> space)
 
   def showVarDecl(decl: PVarDecl): Doc = decl match {
     case PVarDecl(typ, right, left, addressable) =>
@@ -659,6 +666,8 @@ class DefaultPrettyPrinter extends PrettyPrinter with kiama.output.PrettyPrinter
           opt(mip.body)(b => space <> showBodyParameterInfoWithBlock(b._1, b._2))
       case ipa: PImplementationProofPredicateAlias =>
         "pred" <+> showId(ipa.left) <+> ":=" <+> showExprOrType(ipa.right)
+      case ci: PClosureInterface =>
+        "interface" <+> braces(space <> ssep(ci.members.map(showParameter), semi <> space) <> space) <> line
     }
   }
 
@@ -686,6 +695,7 @@ class ShortPrettyPrinter extends DefaultPrettyPrinter {
         "pred" <+> showId(id) <> parens(showParameterList(args))
       case PMPredicateDecl(id, recv, args, _) =>
         "pred" <+> showReceiver(recv) <+> showId(id) <> parens(showParameterList(args))
+      case c: PClosureSpecDecl => super.showMember(c)
       case ip: PImplementationProof =>
         showType(ip.subT) <+> "implements" <+> showType(ip.superT)
     }

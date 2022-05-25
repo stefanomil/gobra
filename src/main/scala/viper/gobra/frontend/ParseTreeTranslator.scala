@@ -441,45 +441,11 @@ class ParseTreeTranslator(pom: PositionManager, source: Source, specOnly : Boole
     * <p>The default implementation returns the result of calling
     * {@link #visitChildren} on {@code ctx}.</p>
     */
-  override def visitClosureSpecDecl(ctx: GobraParser.ClosureSpecDeclContext): Vector[PClosureSpecDecl] = {
-    // The name of each spec must be unique and not blank.
-    val id = idnDef.get(ctx.IDENTIFIER())
-    val interface = if (ctx.closureInterfaceDecl() != null) visitClosureInterfaceDecl(ctx.closureInterfaceDecl()) else PClosureInterfaceDecl(Vector.empty, Vector.empty)
-    val spec = if (ctx.specification() != null) visitSpecification(ctx.specification()) else PFunctionSpec(Vector.empty,Vector.empty,Vector.empty, Vector.empty).at(ctx)
-    if (spec.isTrusted) fail(ctx.specification().TRUSTED(0), "a closure specification does not allow the 'trusted' keyword")
-    if (spec.terminationMeasures.nonEmpty) fail(ctx.specification().specStatement().asScala.view.filter(_.DEC() != null).head, "termination measures are not supported for closure specifications")
-
-    val params = visitNodeOrElse[Vector[Vector[PParameter]]](ctx.closureParams(), Vector.empty)
-    val (args, result) = visitSignature(ctx.signature())
-    Vector(PClosureSpecDecl(id, interface, spec, params.flatten, args, result))
-  }
-
-  /**
-    * {@inheritDoc  }
-    *
-    * <p>The default implementation returns the result of calling
-    * {@link #visitChildren} on {@code ctx}.</p>
-    */
-  override def visitClosureInterfaceDecl(ctx: GobraParser.ClosureInterfaceDeclContext): PClosureInterfaceDecl = {
-    val members = ctx.closureInterfaceMember().asScala.view
-    val stateVars = members.filter(_.type_() != null).map(m => PNamedParameter(idnDef.get(m.IDENTIFIER()), visitNode[PType](m.type_())))
-    val stateFuncs = members.filter(_.signature() != null).map(m => visitSignature(m.signature()))
-
-    PClosureInterfaceDecl(stateVars.toVector, stateFuncs.toVector)
-  }
-
-  /**
-    * {@inheritDoc  }
-    *
-    * <p>The default implementation returns the result of calling
-    * {@link #visitChildren} on {@code ctx}.</p>
-    */
   override def visitPredicateSpec(ctx: PredicateSpecContext): PMPredicateSig = {
     val id = idnDef.get(ctx.IDENTIFIER())
     val args = visitNode[Vector[Vector[PParameter]]](ctx.parameters())
     PMPredicateSig(id, args.flatten).at(ctx)
   }
-
 
   /**
     * Visits the rule
@@ -954,6 +920,47 @@ class ParseTreeTranslator(pom: PositionManager, source: Source, specOnly : Boole
     val body = if (has(ctx.predicateBody())) Some(visitNode[PExpression](ctx.predicateBody().expression())) else None
     Vector(PFPredicateDecl(id, params.flatten, body).at(ctx))
   }
+
+  /**
+    * {@inheritDoc  }
+    *
+    * <p>The default implementation returns the result of calling
+    * {@link #visitChildren} on {@code ctx}.</p>
+    */
+  override def visitClosureSpecDecl(ctx: GobraParser.ClosureSpecDeclContext): Vector[PClosureSpecDecl] = {
+    // The name of each spec must be unique and not blank.
+    val id = idnDef.get(ctx.IDENTIFIER())
+    val interface = if (ctx.closureInterfaceDecl() != null) visitClosureInterfaceDecl(ctx.closureInterfaceDecl()) else PClosureInterface(Vector.empty)
+    val spec = if (ctx.specification() != null) visitSpecification(ctx.specification()) else PFunctionSpec(Vector.empty,Vector.empty,Vector.empty, Vector.empty).at(ctx)
+    if (spec.isTrusted) fail(ctx.specification().TRUSTED(0), "a closure specification does not allow the 'trusted' keyword")
+    if (spec.terminationMeasures.nonEmpty) fail(ctx.specification().specStatement().asScala.view.filter(_.DEC() != null).head, "termination measures are not supported for closure specifications")
+
+    val params = if (ctx.closureParams() != null) visitNode[Vector[Vector[PParameter]]](ctx.closureParams()) else Vector.empty
+    val (args, result) = visitSignature(ctx.signature())
+    Vector(PClosureSpecDecl(id, interface, params.flatten, args, result, spec))
+  }
+
+  override def visitClosureParams(ctx: ClosureParamsContext): Vector[Vector[PParameter]] = {
+    for (param <- ctx.parameterDecl().asScala.toVector) yield visitNode[Vector[PParameter]](param)
+  }
+
+  /**
+    * {@inheritDoc  }
+    *
+    * <p>The default implementation returns the result of calling
+    * {@link #visitChildren} on {@code ctx}.</p>
+    */
+  override def visitClosureInterfaceDecl(ctx: GobraParser.ClosureInterfaceDeclContext): PClosureInterface = {
+    val members = ctx.closureInterfaceMember().asScala.view
+    val vars = members.filter(_.type_() != null).map(m => PNamedParameter(idnDef.get(m.IDENTIFIER()), visitNode[PType](m.type_())))
+    val funcs = members.filter(_.signature() != null).map(m => {
+      val sig = visitSignature(m.signature())
+      PNamedParameter(idnDef.get(m.IDENTIFIER()), PFunctionType(sig._1, sig._2))
+    })
+
+    PClosureInterface((vars concat funcs).toVector)
+  }
+
   //endregion
 
   //endregion
@@ -2172,10 +2179,10 @@ class ParseTreeTranslator(pom: PositionManager, source: Source, specOnly : Boole
   /** Helper Function for optional Nodes
     *
     * @param ctx a context that might be null (signified with ? in the grammar)
-    * @tparam P
+    * @tparam P The PNode type
     * @return a positioned Option of a positioned PNode
     */
-  def visitNodeOrNone[P <: AnyRef](ctx : ParserRuleContext) : Option[P] = {
+  def visitNodeOrNone[P <: PNode](ctx : ParserRuleContext) : Option[P] = {
     if (ctx != null) {
       Some(visitNode(ctx)).pos()
     } else None
@@ -2184,10 +2191,10 @@ class ParseTreeTranslator(pom: PositionManager, source: Source, specOnly : Boole
   /** Helper Function for Nodes with a default
     *
     * @param ctx a context that might be null (signified with ? in the grammar)
-    * @tparam P
+    * @tparam P The PNode type
     * @return a positioned Option of a positioned PNode
     */
-  def visitNodeOrElse[P <: AnyRef](ctx : ParserRuleContext, default : P) : P = {
+  def visitNodeOrElse[P <: PNode](ctx : ParserRuleContext, default : P) : P = {
     visitNodeOrNone[P](ctx) match {
       case Some(value) => value
       case None => default

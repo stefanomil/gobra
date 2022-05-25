@@ -7,7 +7,7 @@
 package viper.gobra.frontend.info.implementation.typing.ghost
 
 import org.bitbucket.inkytonik.kiama.util.Messaging.{Messages, error, noMessages}
-import viper.gobra.ast.frontend.{PBlock, PCodeRootWithResult, PExplicitGhostMember, PFPredicateDecl, PFunctionDecl, PFunctionSpec, PGhostMember, PIdnUse, PImplementationProof, PMPredicateDecl, PMethodDecl, PMethodImplementationProof, PParameter, PReturn, PVariadicType, PWithBody}
+import viper.gobra.ast.frontend.{PBlock, PClosureInterface, PClosureSpecDecl, PCodeRootWithResult, PExplicitGhostMember, PFPredicateDecl, PFunctionDecl, PFunctionSpec, PGhostMember, PIdnUse, PImplementationProof, PMPredicateDecl, PMethodDecl, PMethodImplementationProof, PParameter, PReturn, PVariadicType, PWithBody}
 import viper.gobra.frontend.info.base.SymbolTable.{MPredicateSpec, MethodImpl, MethodSpec}
 import viper.gobra.frontend.info.base.Type.{InterfaceT, Type, UnknownType}
 import viper.gobra.frontend.info.implementation.TypeInfoImpl
@@ -25,6 +25,11 @@ trait GhostMemberTyping extends BaseTyping { this: TypeInfoImpl =>
       body.fold(noMessages)(assignableToSpec) ++
         isReceiverType.errors(miscType(receiver))(member) ++
         nonVariadicArguments(args)
+
+    case c @ PClosureSpecDecl(_, _, params, args, _, _) =>
+      wellDefVariadicArgs(args) ++
+        wellDefVariadicArgs(params, "closure parameter") ++
+        wellDefIfPureClosureSpec(c)
 
     case ip: PImplementationProof =>
       val subType = symbType(ip.subT)
@@ -68,6 +73,17 @@ trait GhostMemberTyping extends BaseTyping { this: TypeInfoImpl =>
     } else noMessages
   }
 
+  private[typing] def wellDefIfPureClosureSpec(closureSpec: PClosureSpecDecl): Messages = {
+
+    if (closureSpec.spec.isPure) {
+      isSingleResultArg(closureSpec) ++
+        isPurePostcondition(closureSpec.spec) ++
+        nonVariadicArguments(closureSpec.args) ++
+        nonVariadicArguments(closureSpec.params) ++
+        noClosureInterface(closureSpec.interface)
+    } else noMessages
+  }
+
   private[typing] def wellDefIfPureMethodImplementationProof(implProof: PMethodImplementationProof): Messages = {
     if (implProof.isPure) {
       isSinglePureReturnExpr(implProof) // all other checks are taken care of by super implementation
@@ -104,9 +120,12 @@ trait GhostMemberTyping extends BaseTyping { this: TypeInfoImpl =>
 
   private def isPurePostcondition(spec: PFunctionSpec): Messages = (spec.posts ++ spec.preserves) flatMap isPureExpr
 
-  private[typing] def nonVariadicArguments(args: Vector[PParameter]): Messages = args.flatMap {
-    p: PParameter => error(p, s"Pure members cannot have variadic arguments, but got $p", p.typ.isInstanceOf[PVariadicType])
+  private[typing] def nonVariadicArguments(args: Vector[PParameter], memberName: String = "Pure members"): Messages = args.flatMap {
+    p: PParameter => error(p, s"$memberName cannot have variadic arguments, but got $p", p.typ.isInstanceOf[PVariadicType])
   }
+
+  private def noClosureInterface(interface: PClosureInterface): Messages =
+    error(interface, s"Pure closures cannot have a state interface, but got $interface", interface.members.nonEmpty)
 
   override lazy val localImplementationProofs: Vector[(Type, InterfaceT, Vector[String], Vector[String])] = {
     val implementationProofs = tree.root.programs.flatMap(_.declarations.collect{ case m: PImplementationProof => m})

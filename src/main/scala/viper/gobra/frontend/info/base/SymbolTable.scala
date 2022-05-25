@@ -188,6 +188,14 @@ object SymbolTable extends Environments[Entity] {
 
   sealed trait GhostDataEntity extends DataEntity with GhostRegular
 
+  case class ClosureSpec(spec: PClosureSpecDecl, context: ExternalTypeInfo) extends GhostDataEntity with WithArguments with WithResult {
+    override def rep: PNode = spec
+    val interface: PClosureInterface = spec.interface
+    val params: Vector[PParameter] = spec.params
+    override val args: Vector[PParameter] = spec.args
+    override val result: PResult = spec.result
+  }
+
   sealed trait Predicate extends GhostDataEntity with WithArguments
 
   case class FPredicate(decl: PFPredicateDecl, context: ExternalTypeInfo) extends Predicate {

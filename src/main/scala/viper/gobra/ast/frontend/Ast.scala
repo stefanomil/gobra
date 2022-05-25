@@ -861,6 +861,17 @@ case class PMPredicateDecl(
 
 case class PMPredicateSig(id: PIdnDef, args: Vector[PParameter]) extends PInterfaceClause with PDependentDef with PScope with PCodeRoot
 
+case class PClosureSpecDecl(
+                             id: PIdnDef,
+                             interface: PClosureInterface,
+                             params: Vector[PParameter],
+                             args: Vector[PParameter],
+                             result: PResult,
+                             spec: PFunctionSpec
+                           ) extends PGhostMember with PScope with PCodeRootWithResult
+
+case class PClosureInterface(members: Vector[PParameter]) extends PGhostMisc
+
 case class PImplementationProof(
                                  subT: PType, superT: PType,
                                  alias: Vector[PImplementationProofPredicateAlias],
@@ -879,20 +890,6 @@ case class PMethodImplementationProof(
 case class PImplementationProofPredicateAlias(left: PIdnUse, right: PNameOrDot) extends PGhostMisc
 
 sealed trait PNameOrDot extends PExpression
-
-case class PClosureSpecDecl(
-                         id: PIdnDef,
-                         interface: PClosureInterfaceDecl,
-                         spec: PFunctionSpec,
-                         params: Vector[PParameter],
-                         args: Vector[PParameter],
-                         result: PResult
-                       ) extends PGhostMember with PScope with PCodeRootWithResult
-
-case class PClosureInterfaceDecl(
-                              vars: Vector[PNamedParameter],
-                              funcs: Vector[(Vector[PParameter], PResult)]
-                            )
 
 /**
   * Ghost Statement

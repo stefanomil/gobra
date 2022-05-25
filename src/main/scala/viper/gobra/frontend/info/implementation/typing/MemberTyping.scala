@@ -36,8 +36,8 @@ trait MemberTyping extends BaseTyping { this: TypeInfoImpl =>
     if (hasInitExpr.nonEmpty) hasInitExpr else if (canAssignInitExpr.nonEmpty) canAssignInitExpr else constExprMsgs
   }
 
-  private[typing] def wellDefVariadicArgs(args: Vector[PParameter]): Messages =
+  private[typing] def wellDefVariadicArgs(args: Vector[PParameter], arg: String = "argument"): Messages =
     args.dropRight(1).flatMap {
-      p => error(p, s"Only the last argument can be variadic, got $p instead", p.typ.isInstanceOf[PVariadicType])
+      p => error(p, s"Only the last $arg can be variadic, got $p instead", p.typ.isInstanceOf[PVariadicType])
     }
 }
