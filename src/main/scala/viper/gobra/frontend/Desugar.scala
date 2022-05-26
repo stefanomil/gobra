@@ -99,6 +99,7 @@ object Desugar {
       combinedDefinedT,
       combinedMethods ++ builtInMethods,
       combineTableField(_.definedFunctions) ++ builtInFunctions,
+      combineTableField(_.definedClosureSpecs),
       combinedMPredicates ++ builtInMPredicates,
       combineTableField(_.definedFPredicates) ++ builtInFPredicates      ,
       combinedMemberProxies,
@@ -216,6 +217,16 @@ object Desugar {
     def methodProxy(id: PIdnUse, context: TypeInfo): in.MethodProxy = {
       val name = idName(id, context)
       in.MethodProxy(id.name, name)(meta(id, context))
+    }
+
+    def closureSpecProxyD(decl: PClosureSpecDecl, context: TypeInfo): in.ClosureSpecProxy = {
+      val name = idName(decl.id, context)
+      in.ClosureSpecProxy(name)(meta(decl, context))
+    }
+
+    def closureSpecProxy(id: PIdnUse, context: TypeInfo): in.ClosureSpecProxy = {
+      val name = idName(id, context)
+      in.ClosureSpecProxy(name)(meta(id, context))
     }
 
     def fpredicateProxyD(decl: PFPredicateDecl, context: TypeInfo): in.FPredicateProxy = {
@@ -344,6 +355,7 @@ object Desugar {
         case NoGhost(x: PConstDecl) => constDeclD(x)
         case NoGhost(x: PMethodDecl) => Vector(registerMethod(x))
         case NoGhost(x: PFunctionDecl) => Vector(registerFunction(x))
+        case NoGhost(x: PClosureSpecDecl) => Vector(registerClosureSpec(x))
         case x: PMPredicateDecl => Vector(registerMPredicate(x))
         case x: PFPredicateDecl => Vector(registerFPredicate(x))
         case x: PImplementationProof => registerImplementationProof(x); Vector.empty
@@ -365,6 +377,7 @@ object Desugar {
         definedTypes,
         definedMethods,
         definedFunctions,
+        definedClosureSpecs,
         definedMPredicates,
         definedFPredicates,
         computeMemberProxies(dMembers ++ additionalMembers, interfaceImplementations, definedTypes),
@@ -720,6 +733,65 @@ object Desugar {
 
       in.PureMethod(recv, name, args, returns, pres, posts, terminationMeasure, bodyOpt)(fsrc)
     }
+
+    def closureSpecD(decl: PClosureSpecDecl): in.ClosureSpecMember =
+      if (decl.spec.isPure) pureClosureSpecD(decl) else closureSpecDAux(decl)
+
+    def pureClosureSpecD(decl: PClosureSpecDecl): in.ClosureSpecMember = {
+      require(decl.spec.isPure)
+      require(decl.interface.members.isEmpty)
+      val in.ClosureSpec(name, _, params, args, results, pres, posts) = closureSpecDAux(decl)
+      in.PureClosureSpec(name, params, args, results, pres, posts)(meta(decl))
+    }
+
+    private def closureSpecDAux(decl: PClosureSpecDecl): in.ClosureSpecMember = {
+        val name = closureSpecProxyD(decl, info)
+        val fsrc = meta(decl)
+
+        val interfaceMembersWithSubs = decl.interface.members.zipWithIndex map { case (p, i) => inParameterD(p,i) }
+        val (interfaceMembers, _) = interfaceMembersWithSubs.unzip
+
+        val paramsWithSubs = decl.params.zipWithIndex map { case (p,i) => inParameterD(p,i) }
+        val (params, _) = paramsWithSubs.unzip
+
+        val argsWithSubs = decl.args.zipWithIndex map { case (p,i) => inParameterD(p,i) }
+        val (args, _) = argsWithSubs.unzip
+
+        val returnsWithSubs = decl.result.outs.zipWithIndex map { case (p,i) => outParameterD(p,i) }
+        val (returns, _) = returnsWithSubs.unzip
+
+        // create context for spec translation
+        val specCtx = new FunctionContext(_ => _ => in.Seqn(Vector.empty)(fsrc)) // dummy assign
+
+        // extent context
+        (decl.args zip argsWithSubs).foreach {
+          // substitution has to be added since otherwise the parameter is translated as a addressable variable
+          // TODO: another, maybe more consistent, option is to always add a context entry
+          case (NoGhost(PNamedParameter(id, _)), (p, _)) => specCtx.addSubst(id, p)
+          case _ =>
+        }
+
+        (decl.interface.members zip interfaceMembersWithSubs).foreach {
+          case (NoGhost(PNamedParameter(id, _)), (p, _)) => specCtx.addSubst(id, p)
+          case _ =>
+        }
+
+        (decl.params zip paramsWithSubs).foreach {
+          case (NoGhost(PNamedParameter(id, _)), (p, _)) => specCtx.addSubst(id, p)
+          case _ =>
+        }
+
+        (decl.result.outs zip returnsWithSubs).foreach {
+          case (NoGhost(PNamedParameter(id, _)), (p, _)) => specCtx.addSubst(id, p)
+          case _ =>
+        }
+
+        // translate pre- and postconditions
+        val pres = (decl.spec.pres ++ decl.spec.preserves) map preconditionD(specCtx)
+        val posts = (decl.spec.preserves ++ decl.spec.posts) map postconditionD(specCtx)
+
+        in.ClosureSpec(name, interfaceMembers, params, args, returns, pres, posts)(fsrc)
+      }
 
     def fpredicateD(decl: PFPredicateDecl): in.FPredicate = {
       val name = fpredicateProxyD(decl, info)
@@ -2104,6 +2176,7 @@ object Desugar {
     var definedTypesSet: Set[(String, Addressability)] = Set.empty
     var definedFunctions : Map[in.FunctionProxy, in.FunctionMember] = Map.empty
     var definedMethods: Map[in.MethodProxy, in.MethodMember] = Map.empty
+    var definedClosureSpecs: Map[in.ClosureSpecProxy, in.ClosureSpecMember] = Map.empty
     var definedMPredicates: Map[in.MPredicateProxy, in.MPredicate] = Map.empty
     var definedFPredicates: Map[in.FPredicateProxy, in.FPredicate] = Map.empty
 
@@ -2312,6 +2385,13 @@ object Desugar {
       function
     }
 
+    def registerClosureSpec(decl: PClosureSpecDecl): in.ClosureSpecMember = {
+      val closureSpec = closureSpecD(decl)
+      val closureSpecProxy = closureSpecProxyD(decl, info)
+      definedClosureSpecs += closureSpecProxy -> closureSpec
+      closureSpec
+    }
+
     def registerMPredicate(decl: PMPredicateDecl): in.MPredicate = {
       val mPredProxy = mpredicateProxyD(decl, info)
       val mPred = mpredicateD(decl)
@@ -2364,7 +2444,8 @@ object Desugar {
 
       case Type.PredT(args) => in.PredT(args.map(typeD(_, Addressability.rValue)(src)), Addressability.rValue)
 
-      case Type.FunctionT(_, _) => ???
+      case Type.FunctionT(args, result) =>
+        in.FunctionT(args.map(typeD(_, Addressability.funcArgument)(src)), typeD(result, Addressability.funcResult)(src), addrMod)
 
       case t: Type.InterfaceT =>
         val interfaceName = nm.interface(t)
@@ -2398,6 +2479,7 @@ object Desugar {
       case f: st.Function => nm.function(id.name, f.context)
       case m: st.MethodImpl => nm.method(id.name, m.decl.receiver.typ, m.context)
       case m: st.MethodSpec => nm.spec(id.name, m.itfType, m.context)
+      case cs: st.ClosureSpec => nm.closureSpec(id.name, cs.context)
       case f: st.FPredicate => nm.function(id.name, f.context)
       case m: st.MPredicateImpl => nm.method(id.name, m.decl.receiver.typ, m.context)
       case m: st.MPredicateSpec => nm.spec(id.name, m.itfType, m.context)
@@ -3121,6 +3203,7 @@ object Desugar {
     private val FIELD_PREFIX = "A"
     private val COPY_PREFIX = "C"
     private val FUNCTION_PREFIX = "F"
+    private val CLOSURESPEC_PREFIX = "CS"
     private val METHODSPEC_PREFIX = "S"
     private val METHOD_PREFIX = "M"
     private val TYPE_PREFIX = "T"
@@ -3178,6 +3261,7 @@ object Desugar {
     def typ     (n: String, context: ExternalTypeInfo): String = topLevelName(TYPE_PREFIX)(n, context)
     def field   (n: String, @unused s: StructT): String = s"$n$FIELD_PREFIX" // Field names must preserve their equality from the Go level
     def function(n: String, context: ExternalTypeInfo): String = topLevelName(FUNCTION_PREFIX)(n, context)
+    def closureSpec(n: String, context: ExternalTypeInfo): String = topLevelName(CLOSURESPEC_PREFIX)(n, context)
     def spec    (n: String, t: Type.InterfaceT, context: ExternalTypeInfo): String =
       topLevelName(s"$METHODSPEC_PREFIX${interface(t)}")(n, context)
     def method  (n: String, t: PMethodRecvType, context: ExternalTypeInfo): String = t match {

@@ -123,6 +123,8 @@ class DefaultPrettyPrinter extends PrettyPrinter with kiama.output.PrettyPrinter
     case n: PureMethod => showPureMethod(n)
     case n: Function => showFunction(n)
     case n: PureFunction => showPureFunction(n)
+    case n: ClosureSpec => showClosureSpec(n)
+    case n: PureClosureSpec => showPureClosureSpec(n)
     case n: FPredicate => showFPredicate(n)
     case n: MPredicate => showMPredicate(n)
     case n: DomainDefinition => showDomainDefinition(n)
@@ -154,6 +156,19 @@ class DefaultPrettyPrinter extends PrettyPrinter with kiama.output.PrettyPrinter
     case PureFunction(name, args, results, pres, posts, measures, body) =>
       "pure func" <+> name.name <> parens(showFormalArgList(args)) <+> parens(showVarDeclList(results)) <>
         spec(showPreconditions(pres) <> showPostconditions(posts) <> showTerminationMeasures(measures)) <> opt(body)(b => block("return" <+> showExpr(b)))
+  }
+
+  def showClosureSpec(f: ClosureSpec): Doc = f match {
+    case ClosureSpec(name, interface, params, args, results, pres, posts) =>
+      "spec" <+> angles(showFormalArgList(params)) <> name.name <> parens(showFormalArgList(args)) <+> parens(showVarDeclList(results)) <>
+        spec(showClosureInterfaceMemberList(interface)) <>
+        spec(showPreconditions(pres) <> showPostconditions(posts))
+  }
+
+  def showPureClosureSpec(f: PureClosureSpec): Doc = f match {
+    case PureClosureSpec(name, params, args, results, pres, posts) =>
+      "pure spec" <+> angles(showFormalArgList(params)) <> name.name <> parens(showFormalArgList(args)) <+> parens(showVarDeclList(results)) <>
+        spec(showPreconditions(pres) <> showPostconditions(posts))
   }
 
   def showMethod(m: Method): Doc = m match {
@@ -242,6 +257,9 @@ class DefaultPrettyPrinter extends PrettyPrinter with kiama.output.PrettyPrinter
 
   def showFormalArgList[T <: Parameter](list: Vector[T]): Doc =
     showVarDeclList(list)
+
+  def showClosureInterfaceMemberList[T <: Parameter](interface: Vector[T]): Doc =
+    "interface" <+> braces(showList(interface, semi)(showVarDecl))
 
   // statements
 
@@ -592,12 +610,13 @@ class DefaultPrettyPrinter extends PrettyPrinter with kiama.output.PrettyPrinter
     case OptionT(elem, _) => "option" <> brackets(showType(elem))
     case SliceT(elem, _) => "[]" <> showType(elem)
     case MapT(keys, values, _) => "map" <> brackets(showType(keys)) <> showType(values)
+    case FunctionT(args, result, _) => "func" <> parens(showTypeList(args)) <+> showType(result)
   }
 
   private def showTypeList[T <: Type](list: Vector[T]): Doc =
     showList(list)(showType)
 
-  def showList[T](list: Seq[T])(f: T => Doc): Doc = ssep(list map f, comma <> space)
+  def showList[T](list: Seq[T], separator: Doc = comma)(f: T => Doc): Doc = ssep(list map f, separator <> space)
 
   def showMap[K, V](map : Map[K, V])(f : K => Doc, g : V => Doc) : Doc =
     ssep(map.map { case (k, v) => f(k) <> ":" <> g(v) }.toVector, comma <> space)

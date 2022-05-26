@@ -937,7 +937,7 @@ class ParseTreeTranslator(pom: PositionManager, source: Source, specOnly : Boole
 
     val params = if (ctx.closureParams() != null) visitNode[Vector[Vector[PParameter]]](ctx.closureParams()) else Vector.empty
     val (args, result) = visitSignature(ctx.signature())
-    Vector(PClosureSpecDecl(id, interface, params.flatten, args, result, spec))
+    Vector(PClosureSpecDecl(id, interface, params.flatten, args, result, spec).at(ctx))
   }
 
   override def visitClosureParams(ctx: ClosureParamsContext): Vector[Vector[PParameter]] = {
@@ -952,13 +952,13 @@ class ParseTreeTranslator(pom: PositionManager, source: Source, specOnly : Boole
     */
   override def visitClosureInterfaceDecl(ctx: GobraParser.ClosureInterfaceDeclContext): PClosureInterface = {
     val members = ctx.closureInterfaceMember().asScala.view
-    val vars = members.filter(_.type_() != null).map(m => PNamedParameter(idnDef.get(m.IDENTIFIER()), visitNode[PType](m.type_())))
+    val vars = members.filter(_.type_() != null).map(m => PNamedParameter(idnDef.get(m.IDENTIFIER()), visitNode[PType](m.type_())).at(m))
     val funcs = members.filter(_.signature() != null).map(m => {
       val sig = visitSignature(m.signature())
-      PNamedParameter(idnDef.get(m.IDENTIFIER()), PFunctionType(sig._1, sig._2))
+      PNamedParameter(idnDef.get(m.IDENTIFIER()), PFunctionType(sig._1, sig._2)).at(m)
     })
 
-    PClosureInterface((vars concat funcs).toVector)
+    PClosureInterface((vars concat funcs).toVector).at(ctx)
   }
 
   //endregion

@@ -9,7 +9,7 @@ package viper.gobra.frontend.info.implementation.typing.ghost
 import org.bitbucket.inkytonik.kiama.util.Messaging.noMessages
 import viper.gobra.ast.frontend.PIdnNode
 import viper.gobra.frontend.info.base.SymbolTable.{BoundVariable, BuiltInFPredicate, BuiltInMPredicate, ClosureSpec, DomainFunction, GhostRegular, Predicate}
-import viper.gobra.frontend.info.base.Type.{AssertionT, FunctionT, SpecT, Type}
+import viper.gobra.frontend.info.base.Type.{AssertionT, FunctionT, Type}
 import viper.gobra.frontend.info.implementation.TypeInfoImpl
 import viper.gobra.util.Violation.violation
 

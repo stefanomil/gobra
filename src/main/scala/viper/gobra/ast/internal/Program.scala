@@ -36,6 +36,7 @@ class LookupTable(
                  definedTypes: Map[(String, Addressability), Type],
                  definedMethods: Map[MethodProxy, MethodLikeMember],
                  definedFunctions: Map[FunctionProxy, FunctionLikeMember],
+                 definedClosureSpecs: Map[ClosureSpecProxy, ClosureSpecLikeMember],
                  definedMPredicates: Map[MPredicateProxy, MPredicateLikeMember],
                  definedFPredicates: Map[FPredicateProxy, FPredicateLikeMember],
                  /**
@@ -53,17 +54,20 @@ class LookupTable(
   def lookup(t: DefinedT): Type = definedTypes(t.name, t.addressability)
   def lookup(m: MethodProxy): MethodLikeMember = definedMethods(m)
   def lookup(f: FunctionProxy): FunctionLikeMember = definedFunctions(f)
+  def lookup(s: ClosureSpecProxy): ClosureSpecLikeMember = definedClosureSpecs(s)
   def lookup(m: MPredicateProxy): MPredicateLikeMember = definedMPredicates(m)
   def lookup(f: FPredicateProxy): FPredicateLikeMember = definedFPredicates(f)
 
   def getMethods: Iterable[MethodLikeMember] = definedMethods.values
   def getFunctions: Iterable[FunctionLikeMember] = definedFunctions.values
+  def getSpecs: Iterable[ClosureSpecLikeMember] = definedClosureSpecs.values
   def getMPredicates: Iterable[MPredicateLikeMember] = definedMPredicates.values
   def getFPredicates: Iterable[FPredicateLikeMember] = definedFPredicates.values
 
   def getDefinedTypes: Map[(String, Addressability), Type] = definedTypes
   def getDefinedMethods: Map[MethodProxy, MethodLikeMember] = definedMethods
   def getDefinedFunctions: Map[FunctionProxy, FunctionLikeMember] = definedFunctions
+  def getDefinedClosureSpecs: Map[ClosureSpecProxy, ClosureSpecLikeMember] = definedClosureSpecs
   def getDefinedMPredicates: Map[MPredicateProxy, MPredicateLikeMember] = definedMPredicates
   def getDefinedFPredicates: Map[FPredicateProxy, FPredicateLikeMember] = definedFPredicates
   def getImplementationProofPredicateAliases: Map[(Type, InterfaceT, String), FPredicateProxy] = implementationProofPredicateAliases
@@ -206,6 +210,42 @@ case class BuiltInFunction(
                           override val argsT: Vector[Type]
                         )(val info: Source.Parser.Info) extends BuiltInMember with FunctionLikeMember {
   require(argsT.forall(_.addressability == Addressability.Exclusive))
+}
+
+sealed trait ClosureSpecLikeMember extends Member {
+  def name: ClosureSpecProxy
+}
+
+sealed trait ClosureSpecMember extends ClosureSpecLikeMember{
+  override def name: ClosureSpecProxy
+  def interface: Vector[Parameter.In]
+  def params: Vector[Parameter.In]
+  def args: Vector[Parameter.In]
+  def results: Vector[Parameter.Out]
+  def pres: Vector[Assertion]
+  def posts: Vector[Assertion]
+}
+
+case class ClosureSpec(
+               override val name: ClosureSpecProxy,
+               override val interface: Vector[Parameter.In],
+               override val params: Vector[Parameter.In],
+               override val args: Vector[Parameter.In],
+               override val results: Vector[Parameter.Out],
+               override val pres: Vector[Assertion],
+               override val posts: Vector[Assertion]
+               )(val info: Source.Parser.Info) extends Member with ClosureSpecMember
+
+case class PureClosureSpec(
+                        override val name: ClosureSpecProxy,
+                        override val params: Vector[Parameter.In],
+                        override val args: Vector[Parameter.In],
+                        override val results: Vector[Parameter.Out],
+                        override val pres: Vector[Assertion],
+                        override val posts: Vector[Assertion]
+                      )(val info: Source.Parser.Info) extends Member with ClosureSpecMember {
+  require(results.size <= 1)
+  override val interface: Vector[Parameter.In] = Vector.empty
 }
 
 sealed trait FPredicateLikeMember extends Member {
@@ -1315,6 +1355,17 @@ case class PointerT(t: Type, addressability: Addressability) extends PrettyType(
     PointerT(t.withAddressability(Addressability.pointerBase), newAddressability)
 }
 
+case class FunctionT(args: Vector[Type], result: Type, addressability: Addressability)
+  extends PrettyType(s"func(${args.mkString(",")}) $result") {
+  override def equalsWithoutMod(t: Type): Boolean = t match {
+    case FunctionT(otherArgs, otherResult, _) =>
+      args.zip(otherArgs).forall{ case (l,r) => l.equalsWithoutMod(r) } &&
+      result.equalsWithoutMod(otherResult)
+    case _ => false
+  }
+  override def withAddressability(newAddressability: Addressability): FunctionT = FunctionT(args, result, newAddressability)
+}
+
 case class TupleT(ts: Vector[Type], addressability: Addressability) extends PrettyType(ts.mkString("(", ", ", ")")) with TopType {
   override def equalsWithoutMod(t: Type): Boolean = t match {
     case TupleT(otherTs, _) => ts.zip(otherTs).forall{ case (l,r) => l.equalsWithoutMod(r) }
@@ -1399,6 +1450,8 @@ sealed trait CallProxy extends Proxy
 case class FunctionProxy(name: String)(val info: Source.Parser.Info) extends Proxy with CallProxy
 case class MethodProxy(name: String, uniqueName: String)(val info: Source.Parser.Info) extends MemberProxy with CallProxy
 case class DomainFuncProxy(name: String, domainName: String)(val info: Source.Parser.Info) extends Proxy
+
+case class ClosureSpecProxy(name: String)(val info: Source.Parser.Info) extends Proxy
 
 sealed trait PredicateProxy extends Proxy
 case class FPredicateProxy(name: String)(val info: Source.Parser.Info) extends PredicateProxy

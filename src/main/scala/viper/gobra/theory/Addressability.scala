@@ -94,6 +94,9 @@ object Addressability {
   val boundVariable: Addressability = rValue
   val constant: Addressability = rValue
 
+  val funcArgument: Addressability = Exclusive
+  val funcResult: Addressability = Exclusive
+
   val dereference: Addressability = pointerBase
   def fieldLookup(receiver: Addressability): Addressability = field(receiver)
   def arrayLookup(receiver: Addressability): Addressability = arrayElement(receiver)
