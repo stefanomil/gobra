@@ -331,6 +331,7 @@ class DefaultPrettyPrinter extends PrettyPrinter with kiama.output.PrettyPrinter
     case FunctionProxy(name) => name
     case MethodProxy(name, _) => name
     case p: DomainFuncProxy => p.name
+    case ClosureSpecProxy(name) => name
     case FPredicateProxy(name) => name
     case MPredicateProxy(name, _) => name
     case l: LabelProxy => l.name
