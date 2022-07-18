@@ -1498,13 +1498,13 @@ object Desugar {
                 args <- dArgs
                 convertedArgs = convertArgs(args)
                 fproxy = getFunctionProxy(base, convertedArgs)
-              } yield Right(in.PureFunctionCall(fproxy, convertedArgs, resT)(src))
+              } yield Right(in.PureFunctionCall(fproxy, convertedArgs, None, resT)(src))
             } else {
               for {
                 args <- dArgs
                 convertedArgs = convertArgs(args)
                 fproxy = getFunctionProxy(base, convertedArgs)
-              } yield Left((targets, in.FunctionCall(targets, fproxy, convertedArgs)(src)))
+              } yield Left((targets, in.FunctionCall(targets, fproxy, convertedArgs, None)(src)))
             }
 
           case iim: ap.ImplicitlyReceivedInterfaceMethod =>
@@ -1516,14 +1516,14 @@ object Desugar {
                 convertedArgs = convertArgs(args)
                 proxy = methodProxy(iim.id, iim.symb.context.getTypeInfo)
                 recvType = typeD(iim.symb.itfType, Addressability.receiver)(src)
-              } yield Right(in.PureMethodCall(implicitThisD(recvType)(src), proxy, convertedArgs, resT)(src))
+              } yield Right(in.PureMethodCall(implicitThisD(recvType)(src), proxy, convertedArgs, None, resT)(src))
             } else {
               for {
                 args <- dArgs
                 convertedArgs = convertArgs(args)
                 proxy = methodProxy(iim.id, iim.symb.context.getTypeInfo)
                 recvType = typeD(iim.symb.itfType, Addressability.receiver)(src)
-              } yield Left((targets, in.MethodCall(targets, implicitThisD(recvType)(src), proxy, convertedArgs)(src)))
+              } yield Left((targets, in.MethodCall(targets, implicitThisD(recvType)(src), proxy, convertedArgs, None)(src)))
             }
 
           case df: ap.DomainFunction =>
@@ -1559,13 +1559,13 @@ object Desugar {
                 (recv, args) <- dRecvWithArgs
                 convertedArgs = convertArgs(args)
                 mproxy = getMethodProxy(base, recv, convertedArgs)
-              } yield Right(in.PureMethodCall(recv, mproxy, convertedArgs, resT)(src))
+              } yield Right(in.PureMethodCall(recv, mproxy, convertedArgs, None, resT)(src))
             } else {
               for {
                 (recv, args) <- dRecvWithArgs
                 convertedArgs = convertArgs(args)
                 mproxy = getMethodProxy(base, recv, convertedArgs)
-              } yield Left((targets, in.MethodCall(targets, recv, mproxy, convertedArgs)(src)))
+              } yield Left((targets, in.MethodCall(targets, recv, mproxy, convertedArgs, None)(src)))
             }
           }
           case sym => Violation.violation(s"expected symbol with arguments and result or a built-in entity, but got $sym")
